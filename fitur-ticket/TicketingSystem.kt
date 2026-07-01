@@ -106,11 +106,11 @@ class Panitia(val idPanitia: String, val nama: String) {
 // 2. MAIN APP (Interaction Layer)
 // ==========================================
 
-// Data promo global yang bisa diubah
-var dataPromo = mutableMapOf(
-    "KONSERBEM" to Pair(20, true),
-    "BEM2026" to Pair(15, true),
-    "MAHASISWA" to Pair(10, false)
+class Transaksi(
+    val namaPembeli: String,
+    val jumlah: Int,
+    val totalBayar: Double,
+    val kodePromo: String?
 )
 
 fun main() {
@@ -118,6 +118,7 @@ fun main() {
     
     val tiketKonser = Tiket("T001", "Festival", 150000.0, 5)
     val panitiaBEM = Panitia("P01", "Irfan Naufal")
+    val transaksiList = mutableListOf<Transaksi>()
 
     while (true) {
         println("\n=== SISTEM TICKETING EVENT BEM ===")
@@ -147,25 +148,31 @@ fun main() {
 
                 if (tiketKonser.prosesPenjualan(jumlah)) {
                     print("Masukkan Kode Promo (ketik 'none' jika tidak ada): ")
-                    val promo = input.next()
+                    val promoInput = input.next()
 
                     var totalHarga = tiketKonser.getHarga() * jumlah
-                    
-                    if (promo.lowercase() != "none") {
-                        val promoValid = panitiaBEM.validasiPromo(promo)
+                    var kodePromoDipakai: String? = null
+
+                    if (promoInput.lowercase() != "none") {
+                        val promoValid = panitiaBEM.validasiPromo(promoInput)
                         if (promoValid != null) {
                             val diskon = promoValid.diskon.toDouble() / 100
                             println("✅ Kode Promo '${promoValid.kode}' Berhasil! Diskon ${promoValid.diskon}% diterapkan.")
                             totalHarga = totalHarga * (1 - diskon)
+                            kodePromoDipakai = promoValid.kode
                         } else {
                             println("❌ Kode promo tidak valid atau sudah kadaluarsa!")
                         }
                     }
 
+                    transaksiList.add(Transaksi(nama, jumlah, totalHarga, kodePromoDipakai))
+
                     println("\n--- BUKTI PEMBELIAN ---")
                     println("Nama Pembeli: $nama")
-                    println("Total Bayar : Rp$totalHarga")
-                    println("Status      : BERHASIL")
+                    println("Jumlah Tiket : $jumlah")
+                    println("Kode Promo   : ${kodePromoDipakai ?: "Tidak Ada"}")
+                    println("Total Bayar  : Rp$totalHarga")
+                    println("Status       : BERHASIL")
                 } else {
                     println("\n❌ Maaf, tiket sudah sold out atau stok tidak mencukupi!")
                 }
@@ -185,6 +192,7 @@ fun main() {
                         println("2. Cek Laporan Stok")
                         println("3. Reset Tiket Terjual")
                         println("4. Kelola Kode Promo")
+                        println("5. Lihat Riwayat Transaksi")
                         println("0. Logout")
                         print("Pilih Aksi: ")
                         
@@ -221,15 +229,7 @@ fun main() {
                                     
                                     when (input.nextInt()) {
                                         1 -> {
-                                            // Tampilkan promo dari data global
-                                            println("\n--- DAFTAR KODE PROMO ---")
-                                            println("Kode\t\tDiskon\tStatus")
-                                            println("────────────────────────────────")
-                                            dataPromo.forEach { (kode, data) ->
-                                                val status = if (data.second) "AKTIF" else "TIDAK AKTIF"
-                                                println("$kode\t\t${data.first}%\t$status")
-                                            }
-                                            println()
+                                            panitiaBEM.lihatSemuaPromo()
                                         }
                                         2 -> {
                                             print("Masukkan kode promo baru: ")
@@ -237,8 +237,7 @@ fun main() {
                                             print("Masukkan besar diskon (%): ")
                                             val diskonBaru = input.nextInt()
                                             if (diskonBaru in 1..100) {
-                                                dataPromo[kodeBaru] = Pair(diskonBaru, true)
-                                                println("✅ Kode promo '$kodeBaru' berhasil ditambahkan dengan diskon $diskonBaru%")
+                                                panitiaBEM.tambahPromo(kodeBaru, diskonBaru)
                                             } else {
                                                 println("❌ Diskon harus antara 1-100%")
                                             }
@@ -250,28 +249,29 @@ fun main() {
                                             val diskonBaru = input.nextInt()
                                             print("Aktifkan? (y/n): ")
                                             val aktifBaru = input.next().lowercase() == "y"
-                                            if (dataPromo.containsKey(kodeEdit)) {
-                                                if (diskonBaru in 1..100) {
-                                                    dataPromo[kodeEdit] = Pair(diskonBaru, aktifBaru)
-                                                    println("✅ Kode promo '$kodeEdit' berhasil diperbarui! (Diskon: $diskonBaru%, Aktif: $aktifBaru)")
-                                                } else {
-                                                    println("❌ Diskon harus antara 1-100%")
-                                                }
+                                            if (diskonBaru in 1..100) {
+                                                panitiaBEM.editPromo(kodeEdit, diskonBaru, aktifBaru)
                                             } else {
-                                                println("❌ Kode promo '$kodeEdit' tidak ditemukan!")
+                                                println("❌ Diskon harus antara 1-100%")
                                             }
                                         }
                                         4 -> {
                                             print("Masukkan kode promo yang akan dihapus: ")
                                             val kodeHapus = input.next().uppercase()
-                                            if (dataPromo.remove(kodeHapus) != null) {
-                                                println("✅ Kode promo '$kodeHapus' berhasil dihapus!")
-                                            } else {
-                                                println("❌ Kode promo '$kodeHapus' tidak ditemukan!")
-                                            }
+                                            panitiaBEM.hapusPromo(kodeHapus)
                                         }
                                         0 -> loopPromo = false
                                         else -> println("Pilihan tidak tersedia.")
+                                    }
+                                }
+                            }
+                            5 -> {
+                                println("\n--- RIWAYAT TRANSAKSI ---")
+                                if (transaksiList.isEmpty()) {
+                                    println("Belum ada transaksi yang tercatat.")
+                                } else {
+                                    transaksiList.forEachIndexed { index, transaksi ->
+                                        println("${index + 1}. ${transaksi.namaPembeli} | Jumlah: ${transaksi.jumlah} | Total: Rp${transaksi.totalBayar} | Promo: ${transaksi.kodePromo ?: "Tidak Ada"}")
                                     }
                                 }
                             }
